@@ -19,10 +19,9 @@ const defaultTravelInfo: TravelInfo = {
 function loadFromStorage<T>(key: string, defaultValue: T): T {
   try {
     const stored = localStorage.getItem(key);
-    return stored ? JSON.parse(stored) : defaultValue;
-  } catch {
-    return defaultValue;
-  }
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return defaultValue;
 }
 
 export default function App() {
@@ -97,15 +96,15 @@ export default function App() {
   ];
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
-      {/* Travel Info Bar - always visible */}
+    <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
+      {/* Travel Info Bar */}
       <TravelInfoBar travelInfo={travelInfo} />
 
-      {/* Main content area */}
+      {/* Main content */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Map - always visible on desktop, toggleable on mobile */}
+        {/* Map area */}
         <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
-          <div className="absolute inset-2">
+          <div className="absolute inset-3">
             <MapView
               places={places}
               onMapClick={handleMapClick}
@@ -116,7 +115,7 @@ export default function App() {
 
           {/* Place Card overlay */}
           {selectedPlace && (
-            <div className="absolute top-4 right-4 z-[1000] max-h-[calc(100%-2rem)] overflow-y-auto">
+            <div className="absolute top-4 right-4 z-50 max-h-[80vh] overflow-y-auto">
               <PlaceCard
                 place={selectedPlace}
                 onEdit={handleEditPlace}
@@ -126,14 +125,14 @@ export default function App() {
             </div>
           )}
 
-          {/* Add place FAB */}
+          {/* FAB */}
           <button
             onClick={() => {
               setEditingPlace(null);
               setMapClickCoords(null);
               setShowPlaceModal(true);
             }}
-            className="absolute bottom-6 right-6 z-[1000] w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-110"
+            className="absolute bottom-6 right-6 z-50 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-110"
             title="Aggiungi luogo"
           >
             +
@@ -141,7 +140,7 @@ export default function App() {
         </div>
 
         {/* Side panel */}
-        <div className={`w-full lg:w-96 xl:w-[420px] bg-gray-50 border-l border-gray-200 overflow-y-auto ${activeTab === 'map' ? 'hidden lg:block' : ''}`}>
+        <div className={`w-full lg:w-96 xl:w-[420px] bg-slate-50 border-l border-slate-200 overflow-y-auto ${activeTab === 'map' ? 'hidden lg:block' : ''}`}>
           <div className="p-4 pb-20 lg:pb-4">
             {activeTab === 'places' && (
               <PlacesList
@@ -174,8 +173,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Bottom navigation - mobile only */}
-      <nav className="bg-white border-t border-gray-200 shadow-sm lg:hidden shrink-0">
+      {/* Bottom nav - mobile */}
+      <nav className="bg-white border-t border-slate-200 shadow-sm lg:hidden shrink-0">
         <div className="flex items-center justify-around py-2">
           {tabs.map((tab) => (
             <button
@@ -184,7 +183,7 @@ export default function App() {
               className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg transition-colors ${
                 activeTab === tab.id
                   ? 'text-blue-600 bg-blue-50'
-                  : 'text-gray-500 hover:text-gray-700'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
             >
               <span className="text-xl">{tab.icon}</span>
@@ -194,8 +193,8 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Desktop sidebar navigation */}
-      <div className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-[2000] flex-col gap-1 bg-white/90 backdrop-blur-sm rounded-r-xl shadow-lg border border-gray-200 p-2">
+      {/* Desktop sidebar nav */}
+      <div className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-[2000] flex-col gap-1 bg-white/95 backdrop-blur-sm rounded-r-xl shadow-lg border border-slate-200 p-2">
         {tabs.map((tab) => (
           <button
             key={tab.id}
@@ -203,7 +202,7 @@ export default function App() {
             className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-all text-sm ${
               activeTab === tab.id
                 ? 'bg-blue-100 text-blue-700 font-medium'
-                : 'text-gray-600 hover:bg-gray-100'
+                : 'text-slate-600 hover:bg-slate-100'
             }`}
             title={tab.label}
           >
