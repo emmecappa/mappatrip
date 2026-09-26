@@ -1,7 +1,6 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import { Place } from '../types';
-import { useEffect } from 'react';
 
 interface Props {
   places: Place[];
@@ -42,16 +41,11 @@ function MapClickHandler({ onMapClick }: { onMapClick?: (lat: number, lng: numbe
   return null;
 }
 
-export default function MapView({ places, onMapClick, selectedPlace, onSelectPlace }: Props) {
+export default function MapView({ places, onMapClick, onSelectPlace }: Props) {
   const defaultCenter: [number, number] = [41.9028, 12.4964]; // Roma
-  
-  useEffect(() => {
-    // Fix for default marker icons in leaflet
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-  }, []);
 
   return (
-    <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-gray-200">
+    <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-gray-200 relative">
       <MapContainer
         center={defaultCenter}
         zoom={6}

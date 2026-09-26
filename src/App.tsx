@@ -35,7 +35,6 @@ export default function App() {
   const [editingPlace, setEditingPlace] = useState<Place | null>(null);
   const [mapClickCoords, setMapClickCoords] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Persist to localStorage
   useEffect(() => {
     localStorage.setItem('travel_places', JSON.stringify(places));
   }, [places]);
@@ -98,15 +97,15 @@ export default function App() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="h-screen flex flex-col overflow-hidden bg-gray-50">
       {/* Travel Info Bar - always visible */}
       <TravelInfoBar travelInfo={travelInfo} />
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Map section - always visible on desktop, hidden on mobile when not on map tab */}
-        <div className={`${activeTab === 'map' ? 'block' : 'hidden'} lg:block lg:flex-1 relative`}>
-          <div className="absolute inset-0 p-3">
+      {/* Main content area */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Map - always visible on desktop, toggleable on mobile */}
+        <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
+          <div className="absolute inset-2">
             <MapView
               places={places}
               onMapClick={handleMapClick}
@@ -117,7 +116,7 @@ export default function App() {
 
           {/* Place Card overlay */}
           {selectedPlace && (
-            <div className="absolute top-4 right-4 z-10 max-h-[80vh] overflow-y-auto">
+            <div className="absolute top-4 right-4 z-[1000] max-h-[calc(100%-2rem)] overflow-y-auto">
               <PlaceCard
                 place={selectedPlace}
                 onEdit={handleEditPlace}
@@ -127,23 +126,23 @@ export default function App() {
             </div>
           )}
 
-          {/* Add place button on map */}
+          {/* Add place FAB */}
           <button
             onClick={() => {
               setEditingPlace(null);
               setMapClickCoords(null);
               setShowPlaceModal(true);
             }}
-            className="absolute bottom-6 right-6 z-10 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-110"
+            className="absolute bottom-6 right-6 z-[1000] w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-110"
             title="Aggiungi luogo"
           >
             +
           </button>
         </div>
 
-        {/* Side panel for other tabs */}
-        <div className={`${activeTab !== 'map' ? 'block' : 'hidden'} lg:block lg:w-96 xl:w-[420px] bg-gray-50 border-l border-gray-200 overflow-y-auto scrollbar-thin`}>
-          <div className="p-4">
+        {/* Side panel */}
+        <div className={`w-full lg:w-96 xl:w-[420px] bg-gray-50 border-l border-gray-200 overflow-y-auto ${activeTab === 'map' ? 'hidden lg:block' : ''}`}>
+          <div className="p-4 pb-20 lg:pb-4">
             {activeTab === 'places' && (
               <PlacesList
                 places={places}
@@ -175,8 +174,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Bottom navigation */}
-      <nav className="bg-white border-t border-gray-200 shadow-lg lg:hidden">
+      {/* Bottom navigation - mobile only */}
+      <nav className="bg-white border-t border-gray-200 shadow-sm lg:hidden shrink-0">
         <div className="flex items-center justify-around py-2">
           {tabs.map((tab) => (
             <button
@@ -196,7 +195,7 @@ export default function App() {
       </nav>
 
       {/* Desktop sidebar navigation */}
-      <div className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-20 flex-col gap-1 bg-white/90 backdrop-blur-sm rounded-r-xl shadow-lg border border-gray-200 p-2">
+      <div className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-[2000] flex-col gap-1 bg-white/90 backdrop-blur-sm rounded-r-xl shadow-lg border border-gray-200 p-2">
         {tabs.map((tab) => (
           <button
             key={tab.id}
