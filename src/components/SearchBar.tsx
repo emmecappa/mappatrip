@@ -1,13 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 
 interface SearchResult {
-  place_id: number;
-  lat: string;
-  lon: string;
-  display_name: string;
+  id: number;
+  lat: number;
+  lon: number;
+  name: string;
   type: string;
-  class: string;
-  icon?: string;
+  tags: Record<string, string>;
 }
 
 interface Props {
@@ -21,6 +20,7 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [error, setError] = useState('');
+  const [searchMode, setSearchMode] = useState<'places' | 'businesses'>('places');
   const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -48,55 +48,118 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
     searchTimeout.current = setTimeout(async () => {
       setIsSearching(true);
       setError('');
+      
       try {
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
-          {
-            headers: {
-              'Accept': 'application/json',
-            }
-          }
-        );
-        
-        if (!response.ok) throw new Error('Errore nella ricerca');
-        
-        const data: SearchResult[] = await response.json();
-        setResults(data);
-        setShowResults(true);
+        if (searchMode === 'businesses') {
+          // Overpass API per attività commerciali
+          await searchOverpass(query);
+        } else {
+          // Nominatim per luoghi generali
+          await searchNominatim(query);
+        }
       } catch (err) {
         setError('Errore nella ricerca. Riprova.');
         setResults([]);
       } finally {
         setIsSearching(false);
       }
-    }, 500); // Debounce 500ms
+    }, 500);
 
     return () => {
       if (searchTimeout.current) {
         clearTimeout(searchTimeout.current);
       }
     };
-  }, [query]);
+  }, [query, searchMode]);
+
+  const searchNominatim = async (query: string) => {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    
+    if (!response.ok) throw new Error('Errore nella ricerca');
+    
+    const data = await response.json();
+    const results: SearchResult[] = data.map((item: any) => ({
+      id: item.place_id,
+      lat: parseFloat(item.lat),
+      lon: parseFloat(item.lon),
+      name: item.display_name.split(',')[0],
+      type: item.type,
+      tags: { display_name: item.display_name, class: item.class }
+    }));
+    
+    setResults(results);
+    setShowResults(true);
+  };
+
+  const searchOverpass = async (query: string) => {
+    // Query Overpass per cercare attività commerciali (ricerca globale)
+    const overpassQuery = `
+      [out:json][timeout:25];
+      (
+        node["name"~"${query}",i];
+        way["name"~"${query}",i];
+        relation["name"~"${query}",i];
+      );
+      out center 10;
+    `;
+
+    const response = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: `data=${encodeURIComponent(overpassQuery)}`,
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    });
+
+    if (!response.ok) throw new Error('Errore nella ricerca');
+    
+    const data = await response.json();
+    const results: SearchResult[] = data.elements
+      .filter((el: any) => el.tags?.name)
+      .map((el: any) => ({
+        id: el.id,
+        lat: el.lat || el.center?.lat || 0,
+        lon: el.lon || el.center?.lon || 0,
+        name: el.tags.name,
+        type: el.tags.amenity || el.tags.shop || el.tags.tourism || 'place',
+        tags: el.tags
+      }));
+
+    setResults(results);
+    setShowResults(true);
+  };
 
   const handleSelect = (result: SearchResult) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-    const name = result.display_name.split(',')[0]; // Primo elemento del nome
-    onSelect(lat, lng, name);
+    onSelect(result.lat, result.lon, result.name);
     setQuery('');
     setResults([]);
     setShowResults(false);
   };
 
   const handlePreview = (result: SearchResult) => {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
     if (onPreview) {
-      onPreview(lat, lng);
+      onPreview(result.lat, result.lon);
     }
   };
 
   const getCategoryIcon = (result: SearchResult): string => {
+    const tags = result.tags;
+    
+    // Priorità alle tag specifiche
+    if (tags.amenity === 'restaurant' || tags.cuisine) return '🍽️';
+    if (tags.amenity === 'cafe') return '☕';
+    if (tags.amenity === 'bar' || tags.amenity === 'pub') return '🍺';
+    if (tags.amenity === 'fast_food') return '🍔';
+    if (tags.shop) return '🛍️';
+    if (tags.tourism === 'hotel') return '🏨';
+    if (tags.tourism === 'museum') return '🏛️';
+    if (tags.tourism === 'attraction') return '🎯';
+    if (tags.leisure) return '🎮';
+    if (tags.historic) return '🏛️';
+    if (tags.natural) return '🌿';
+    
+    // Fallback per classe
     const classMap: Record<string, string> = {
       'amenity': '🏛️',
       'tourism': '🎯',
@@ -107,14 +170,52 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
       'historic': '🏛️',
       'natural': '🌿',
       'place': '📍',
-      'highway': '🛣️',
-      'building': '🏢',
     };
-    return classMap[result.class] || '📍';
+    
+    return classMap[result.type] || '📍';
+  };
+
+  const getCategoryLabel = (result: SearchResult): string => {
+    const tags = result.tags;
+    
+    if (tags.amenity === 'restaurant') return tags.cuisine ? `Ristorante (${tags.cuisine})` : 'Ristorante';
+    if (tags.amenity === 'cafe') return 'Caffè';
+    if (tags.amenity === 'bar' || tags.amenity === 'pub') return 'Bar/Pub';
+    if (tags.amenity === 'fast_food') return 'Fast Food';
+    if (tags.shop) return `Negozio (${tags.shop})`;
+    if (tags.tourism === 'hotel') return 'Hotel';
+    if (tags.tourism === 'museum') return 'Museo';
+    if (tags.tourism === 'attraction') return 'Attrazione';
+    
+    return result.type;
   };
 
   return (
     <div ref={containerRef} className="relative w-full max-w-md">
+      {/* Mode toggle */}
+      <div className="flex gap-2 mb-2">
+        <button
+          onClick={() => setSearchMode('places')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            searchMode === 'places'
+              ? 'bg-blue-500 text-white'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          📍 Luoghi
+        </button>
+        <button
+          onClick={() => setSearchMode('businesses')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            searchMode === 'businesses'
+              ? 'bg-blue-500 text-white'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          🏪 Attività
+        </button>
+      </div>
+
       {/* Search input */}
       <div className="relative">
         <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
@@ -134,7 +235,9 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length > 0 && setShowResults(true)}
-          placeholder="Cerca luoghi, città, ristoranti..."
+          placeholder={searchMode === 'businesses' 
+            ? "Cerca ristoranti, negozi, bar..." 
+            : "Cerca luoghi, città, monumenti..."}
           className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-slate-400"
         />
         {query && (
@@ -158,7 +261,7 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
         <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden z-50 max-h-96 overflow-y-auto scrollbar-thin">
           {results.map((result) => (
             <div
-              key={result.place_id}
+              key={`${result.id}-${result.lat}`}
               className="p-3 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 transition-colors group"
               onClick={() => handleSelect(result)}
               onMouseEnter={() => handlePreview(result)}
@@ -167,11 +270,16 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
                 <span className="text-2xl">{getCategoryIcon(result)}</span>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-slate-900 text-sm truncate">
-                    {result.display_name.split(',')[0]}
+                    {result.name}
                   </p>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">
-                    {result.display_name.split(',').slice(1, 3).join(',')}
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {getCategoryLabel(result)}
                   </p>
+                  {result.tags['addr:street'] && (
+                    <p className="text-xs text-slate-400 mt-0.5 truncate">
+                      📍 {result.tags['addr:street']} {result.tags['addr:housenumber'] || ''}
+                    </p>
+                  )}
                 </div>
                 <button
                   onClick={(e) => {
@@ -199,7 +307,11 @@ export default function SearchBar({ onSelect, onPreview }: Props) {
       {showResults && results.length === 0 && query.length >= 3 && !isSearching && (
         <div className="absolute top-full mt-2 w-full bg-white rounded-xl shadow-xl border border-slate-200 p-4 text-center z-50">
           <p className="text-sm text-slate-500">Nessun risultato trovato</p>
-          <p className="text-xs text-slate-400 mt-1">Prova con un nome diverso</p>
+          <p className="text-xs text-slate-400 mt-1">
+            {searchMode === 'businesses' 
+              ? 'Prova con un nome specifico di attività'
+              : 'Prova con un nome diverso'}
+          </p>
         </div>
       )}
     </div>
