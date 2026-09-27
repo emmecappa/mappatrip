@@ -7,6 +7,16 @@
   }
 }
 
+/* Leaflet custom styles */
+.leaflet-container {
+  font-family: inherit;
+}
+
+.custom-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }
