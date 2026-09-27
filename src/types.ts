@@ -26,6 +26,7 @@ export interface TravelInfo {
   departureDate: string;
   hotelName: string;
   hotelLink: string;
+  googleMapsApiKey?: string;
 }
 
 export type TabType = 'map' | 'places' | 'diary' | 'settings';
