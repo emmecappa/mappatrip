@@ -10,6 +10,8 @@ export default function SettingsPanel({ travelInfo, onSave }: Props) {
   const [form, setForm] = useState<TravelInfo>({ ...travelInfo });
   const [showApiKeyHelp, setShowApiKeyHelp] = useState(false);
 
+  const envApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSave(form);
@@ -96,22 +98,41 @@ export default function SettingsPanel({ travelInfo, onSave }: Props) {
             🗺️ Google Maps
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            {form.googleMapsApiKey 
-              ? '✅ Google Maps attivo - ricerca avanzata disponibile' 
-              : 'Aggiungi la tua API key per usare Google Maps'}
+            {envApiKey 
+              ? '✅ Google Maps attivo (variabile d\'ambiente) - ricerca avanzata disponibile' 
+              : form.googleMapsApiKey 
+                ? '✅ Google Maps attivo - ricerca avanzata disponibile' 
+                : 'Aggiungi la tua API key per usare Google Maps'}
           </p>
         </div>
 
         <div className="p-6 space-y-4">
+          {envApiKey && (
+            <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800 font-medium">✅ API Key configurata via variabile d'ambiente</p>
+              <p className="text-xs text-green-700 mt-1">
+                La chiave è impostata in <code className="bg-green-100 px-1 rounded">VITE_GOOGLE_MAPS_API_KEY</code>
+              </p>
+            </div>
+          )}
+          
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">🔑 API Key</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">🔑 API Key (alternativa)</label>
             <input
               type="text"
               value={form.googleMapsApiKey || ''}
               onChange={(e) => setForm({ ...form, googleMapsApiKey: e.target.value })}
               placeholder="AIzaSy..."
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm"
+              disabled={!!envApiKey}
+              className={`w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono text-sm ${
+                envApiKey ? 'bg-gray-100 cursor-not-allowed' : ''
+              }`}
             />
+            {envApiKey && (
+              <p className="text-xs text-gray-500 mt-1">
+                La chiave è già configurata via variabile d'ambiente
+              </p>
+            )}
           </div>
 
           <button

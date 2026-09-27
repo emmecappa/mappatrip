@@ -35,6 +35,9 @@ export default function App() {
   const [editingPlace, setEditingPlace] = useState<Place | null>(null);
   const [mapClickCoords, setMapClickCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Leggi API key da variabile d'ambiente o da localStorage
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || travelInfo.googleMapsApiKey;
+
   useEffect(() => {
     localStorage.setItem('travel_places', JSON.stringify(places));
   }, [places]);
@@ -123,14 +126,14 @@ export default function App() {
         {/* Map area */}
         <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
           <div className="absolute inset-3">
-            {travelInfo.googleMapsApiKey ? (
+            {googleMapsApiKey ? (
               <GoogleMapView
                 places={places}
                 onMapClick={handleMapClick}
                 selectedPlace={selectedPlace}
                 onSelectPlace={setSelectedPlace}
                 onSearchSelect={handleSearchSelect}
-                apiKey={travelInfo.googleMapsApiKey}
+                apiKey={googleMapsApiKey}
               />
             ) : (
               <MapView
