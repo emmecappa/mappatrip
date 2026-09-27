@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Place, DiaryEntry, TravelInfo, TabType } from './types';
 import TravelInfoBar from './components/TravelInfoBar';
 import MapView from './components/MapView';
+import GoogleMapView from './components/GoogleMapView';
 import PlaceCard from './components/PlaceCard';
 import PlaceModal from './components/PlaceModal';
 import PlacesList from './components/PlacesList';
@@ -122,13 +123,24 @@ export default function App() {
         {/* Map area */}
         <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
           <div className="absolute inset-3">
-            <MapView
-              places={places}
-              onMapClick={handleMapClick}
-              selectedPlace={selectedPlace}
-              onSelectPlace={setSelectedPlace}
-              onSearchSelect={handleSearchSelect}
-            />
+            {travelInfo.googleMapsApiKey ? (
+              <GoogleMapView
+                places={places}
+                onMapClick={handleMapClick}
+                selectedPlace={selectedPlace}
+                onSelectPlace={setSelectedPlace}
+                onSearchSelect={handleSearchSelect}
+                apiKey={travelInfo.googleMapsApiKey}
+              />
+            ) : (
+              <MapView
+                places={places}
+                onMapClick={handleMapClick}
+                selectedPlace={selectedPlace}
+                onSelectPlace={setSelectedPlace}
+                onSearchSelect={handleSearchSelect}
+              />
+            )}
           </div>
 
           {/* Place Card overlay */}
