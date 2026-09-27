@@ -52,6 +52,23 @@ export default function App() {
     setShowPlaceModal(true);
   };
 
+  const handleSearchSelect = (lat: number, lng: number, name: string) => {
+    setMapClickCoords({ lat, lng });
+    setEditingPlace({
+      id: '',
+      name,
+      lat,
+      lng,
+      impressions: '',
+      photos: [],
+      notes: '',
+      youtubeLinks: [],
+      category: 'attraction',
+      visited: false,
+    });
+    setShowPlaceModal(true);
+  };
+
   const handleSavePlace = (place: Place) => {
     const exists = places.find(p => p.id === place.id);
     if (exists) {
@@ -110,6 +127,7 @@ export default function App() {
               onMapClick={handleMapClick}
               selectedPlace={selectedPlace}
               onSelectPlace={setSelectedPlace}
+              onSearchSelect={handleSearchSelect}
             />
           </div>
 
