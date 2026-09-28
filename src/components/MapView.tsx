@@ -1,4 +1,4 @@
-import { Place } from '../types';
+import { Place, AppMode } from '../types';
 import MapViewLeaflet from './MapViewLeaflet';
 import MapViewGoogle from './MapViewGoogle';
 
@@ -9,9 +9,10 @@ interface Props {
   onSelectPlace: (place: Place) => void;
   onAddFromSearch: (lat: number, lng: number, name: string) => void;
   apiKey: string;
+  mode: AppMode;
 }
 
-export default function MapView({ places, onMapClick, selectedPlace, onSelectPlace, onAddFromSearch, apiKey }: Props) {
+export default function MapView({ places, onMapClick, selectedPlace, onSelectPlace, onAddFromSearch, apiKey, mode }: Props) {
   if (apiKey) {
     return (
       <MapViewGoogle
@@ -21,6 +22,7 @@ export default function MapView({ places, onMapClick, selectedPlace, onSelectPla
         onSelectPlace={onSelectPlace}
         onAddFromSearch={onAddFromSearch}
         apiKey={apiKey}
+        mode={mode}
       />
     );
   }
@@ -32,6 +34,7 @@ export default function MapView({ places, onMapClick, selectedPlace, onSelectPla
       selectedPlace={selectedPlace}
       onSelectPlace={onSelectPlace}
       onAddFromSearch={onAddFromSearch}
+      mode={mode}
     />
   );
 }

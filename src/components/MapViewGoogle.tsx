@@ -1,5 +1,5 @@
 import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
-import { Place } from '../types';
+import { Place, AppMode } from '../types';
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   onSelectPlace: (place: Place) => void;
   onAddFromSearch: (lat: number, lng: number, name: string) => void;
   apiKey: string;
+  mode: AppMode;
 }
 
 interface Prediction {
@@ -38,7 +39,7 @@ const categoryIcons: Record<string, string> = {
   other: '📍',
 };
 
-export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAddFromSearch, apiKey }: Props) {
+export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAddFromSearch, apiKey, mode }: Props) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [selectedInfoPlace, setSelectedInfoPlace] = useState<Place | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,6 +79,14 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (mode === 'visit') {
+      setSearchQuery('');
+      setPredictions([]);
+      setShowPredictions(false);
+    }
+  }, [mode]);
+
   const onLoad = useCallback((mapInstance: google.maps.Map) => {
     setMap(mapInstance);
   }, []);
@@ -87,10 +96,10 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
   }, []);
 
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
-    if (e.latLng) {
+    if (e.latLng && mode === 'planning') {
       onMapClick(e.latLng.lat(), e.latLng.lng());
     }
-  }, [onMapClick]);
+  }, [onMapClick, mode]);
 
   useEffect(() => {
     if (searchQuery.length < 2) {
@@ -184,47 +193,50 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
 
   return (
     <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-slate-200 relative">
-      <div ref={containerRef} className="absolute top-3 left-3 right-3 z-[1000]">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca su Google Maps..."
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-          <div className="absolute left-3 top-1/2 -translate-y-1/2">
-            {isLoading ? (
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            )}
+      {/* Search bar - solo in modalità planning */}
+      {mode === 'planning' && (
+        <div ref={containerRef} className="absolute top-3 left-3 right-3 z-[1000]">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cerca su Google Maps..."
+              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+              {isLoading ? (
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              )}
+            </div>
           </div>
-        </div>
 
-        {showPredictions && predictions.length > 0 && (
-          <div className="mt-2 bg-white rounded-xl shadow-xl border border-slate-200 max-h-80 overflow-y-auto">
-            {predictions.map((prediction, idx) => (
-              <button
-                key={prediction.place_id || idx}
-                onClick={() => handleSelectPrediction(prediction)}
-                className="w-full p-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0"
-              >
-                <p className="font-medium text-sm text-slate-900">
-                  {prediction.structured_formatting?.main_text || prediction.description.split(',')[0]}
-                </p>
-                {prediction.structured_formatting?.secondary_text && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    {prediction.structured_formatting.secondary_text}
+          {showPredictions && predictions.length > 0 && (
+            <div className="mt-2 bg-white rounded-xl shadow-xl border border-slate-200 max-h-80 overflow-y-auto">
+              {predictions.map((prediction, idx) => (
+                <button
+                  key={prediction.place_id || idx}
+                  onClick={() => handleSelectPrediction(prediction)}
+                  className="w-full p-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0"
+                >
+                  <p className="font-medium text-sm text-slate-900">
+                    {prediction.structured_formatting?.main_text || prediction.description.split(',')[0]}
                   </p>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+                  {prediction.structured_formatting?.secondary_text && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {prediction.structured_formatting.secondary_text}
+                    </p>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <GoogleMap
         mapContainerStyle={containerStyle}
@@ -234,7 +246,7 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
         onUnmount={onUnmount}
         onClick={handleMapClick}
         options={{
-          streetViewControl: false,
+          streetViewControl: true,
           mapTypeControl: true,
           fullscreenControl: false,
         }}
@@ -256,7 +268,7 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
             position={{ lat: selectedInfoPlace.lat, lng: selectedInfoPlace.lng }}
             onCloseClick={() => setSelectedInfoPlace(null)}
           >
-            <div className="p-2 min-w-[200px]">
+            <div className="p-2 min-w-[220px]">
               <div className="flex items-center gap-2 mb-2">
                 <span className="text-2xl">{categoryIcons[selectedInfoPlace.category]}</span>
                 <div>
@@ -264,15 +276,38 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
                   <p className="text-xs text-slate-500 capitalize">{selectedInfoPlace.category}</p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  onSelectPlace(selectedInfoPlace);
-                  setSelectedInfoPlace(null);
-                }}
-                className="w-full px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"
-              >
-                Vedi dettagli
-              </button>
+              {selectedInfoPlace.photos && selectedInfoPlace.photos.length > 0 && (
+                <img 
+                  src={selectedInfoPlace.photos[0]} 
+                  alt={selectedInfoPlace.name}
+                  className="w-full h-28 object-cover rounded mb-2"
+                />
+              )}
+              {selectedInfoPlace.impressions && (
+                <p className="text-xs text-slate-700 mb-2">{selectedInfoPlace.impressions.substring(0, 120)}...</p>
+              )}
+              {selectedInfoPlace.notes && (
+                <p className="text-xs text-slate-600 mb-2 italic">📝 {selectedInfoPlace.notes.substring(0, 100)}...</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    onSelectPlace(selectedInfoPlace);
+                    setSelectedInfoPlace(null);
+                  }}
+                  className="flex-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"
+                >
+                  Dettagli
+                </button>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${selectedInfoPlace.lat},${selectedInfoPlace.lng}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200"
+                >
+                  🗺️
+                </a>
+              </div>
             </div>
           </InfoWindow>
         )}
