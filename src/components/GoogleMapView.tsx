@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { GoogleMap, Marker, InfoWindow, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
 import { Place } from '../types';
 
@@ -21,14 +21,6 @@ const defaultCenter = {
   lng: 12.4964
 };
 
-const categoryColors: Record<string, string> = {
-  restaurant: '#ef4444',
-  attraction: '#8b5cf6',
-  hotel: '#f59e0b',
-  activity: '#10b981',
-  other: '#6b7280',
-};
-
 const categoryIcons: Record<string, string> = {
   restaurant: '🍽️',
   attraction: '🏛️',
@@ -41,7 +33,10 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const [searchResult, setSearchResult] = useState<google.maps.places.PlaceResult | null>(null);
   const [selectedInfoPlace, setSelectedInfoPlace] = useState<Place | null>(null);
+  const [searchError, setSearchError] = useState<string>('');
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  
+  console.log('🔑 Google Maps API Key:', apiKey ? 'Presente' : 'Mancante');
   
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
@@ -50,6 +45,7 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
   });
 
   const onLoad = useCallback((map: google.maps.Map) => {
+    console.log('✅ Google Maps caricato con successo');
     setMap(map);
   }, []);
 
@@ -64,38 +60,93 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
   }, [onMapClick]);
 
   const onPlacesChanged = () => {
-    if (autocompleteRef.current) {
+    console.log('🔍 onPlacesChanged chiamato');
+    
+    if (!autocompleteRef.current) {
+      console.error('❌ autocompleteRef.current è null');
+      setSearchError('Autocomplete non inizializzato');
+      return;
+    }
+
+    try {
       const place = autocompleteRef.current.getPlace();
-      if (place.geometry?.location) {
-        setSearchResult(place);
-        
-        // Center map on selected place
-        if (map) {
-          map.panTo(place.geometry.location);
-          map.setZoom(15);
-        }
-        
-        // Call onSearchSelect with place details
-        const name = place.name || place.formatted_address || 'Luogo';
-        onSearchSelect(
-          place.geometry.location.lat(),
-          place.geometry.location.lng(),
-          name
-        );
+      console.log('📍 Place ottenuto:', place);
+
+      if (!place.geometry) {
+        console.error('❌ Place non ha geometria:', place);
+        setSearchError('Luogo non trovato. Prova a selezionare un risultato dai suggerimenti.');
+        return;
       }
+
+      if (!place.geometry.location) {
+        console.error('❌ Place non ha location:', place);
+        setSearchError('Coordinate non disponibili per questo luogo');
+        return;
+      }
+
+      setSearchError('');
+      setSearchResult(place);
+      
+      // Center map on selected place
+      if (map) {
+        map.panTo(place.geometry.location);
+        map.setZoom(15);
+      }
+      
+      // Call onSearchSelect with place details
+      const name = place.name || place.formatted_address || 'Luogo';
+      console.log('✅ Chiamata onSearchSelect con:', name, place.geometry.location.lat(), place.geometry.location.lng());
+      
+      onSearchSelect(
+        place.geometry.location.lat(),
+        place.geometry.location.lng(),
+        name
+      );
+    } catch (error) {
+      console.error('❌ Errore in onPlacesChanged:', error);
+      setSearchError('Errore nella ricerca. Riprova.');
     }
   };
 
   const onAutocompleteLoad = (autocomplete: google.maps.places.Autocomplete) => {
+    console.log('✅ Autocomplete caricato');
     autocompleteRef.current = autocomplete;
   };
 
+  if (!apiKey) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-yellow-50 rounded-xl border border-yellow-200">
+        <div className="text-center p-6 max-w-md">
+          <span className="text-5xl block mb-4">🔑</span>
+          <p className="text-yellow-800 font-medium text-lg">API Key mancante</p>
+          <p className="text-yellow-700 text-sm mt-2">
+            Per usare Google Maps, inserisci la tua API Key nelle impostazioni
+          </p>
+          <p className="text-yellow-600 text-xs mt-3">
+            Vai in ⚙️ Info → sezione 🗺️ Google Maps
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (loadError) {
+    console.error('❌ Errore caricamento Google Maps:', loadError);
     return (
       <div className="w-full h-full flex items-center justify-center bg-red-50 rounded-xl border border-red-200">
-        <div className="text-center p-6">
-          <p className="text-red-600 font-medium">Errore nel caricamento di Google Maps</p>
-          <p className="text-red-500 text-sm mt-2">Verifica la tua API Key nelle impostazioni</p>
+        <div className="text-center p-6 max-w-md">
+          <span className="text-5xl block mb-4">❌</span>
+          <p className="text-red-600 font-medium text-lg">Errore nel caricamento di Google Maps</p>
+          <p className="text-red-500 text-sm mt-2">
+            Verifica che la tua API Key sia valida e che le seguenti API siano abilitate:
+          </p>
+          <ul className="text-red-500 text-xs mt-2 text-left list-disc list-inside">
+            <li>Maps JavaScript API</li>
+            <li>Places API</li>
+          </ul>
+          <p className="text-red-400 text-xs mt-3">
+            Controlla anche la console del browser per maggiori dettagli
+          </p>
         </div>
       </div>
     );
@@ -131,11 +182,25 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
             </div>
             <input
               type="text"
-              placeholder="Cerca su Google Maps..."
+              placeholder="Cerca su Google Maps (es: ristoranti Roma)..."
               className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-slate-400"
             />
           </div>
         </Autocomplete>
+
+        {/* Error message */}
+        {searchError && (
+          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            ⚠️ {searchError}
+          </div>
+        )}
+
+        {/* Success message */}
+        {searchResult && !searchError && (
+          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            ✅ <strong>{searchResult.name}</strong> trovato! Il modal si aprirà automaticamente.
+          </div>
+        )}
       </div>
 
       {/* Google Map */}
@@ -148,7 +213,7 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
         onClick={handleMapClick}
         options={{
           streetViewControl: false,
-          mapTypeControl: false,
+          mapTypeControl: true,
           fullscreenControl: false,
         }}
       >
