@@ -30,3 +30,4 @@ export interface TravelInfo {
 }
 
 export type TabType = 'map' | 'places' | 'diary' | 'settings';
+export type AppMode = 'planning' | 'visit';

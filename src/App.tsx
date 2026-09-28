@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Place, DiaryEntry, TravelInfo, TabType } from './types';
+import { Place, DiaryEntry, TravelInfo, TabType, AppMode } from './types';
 import TravelInfoBar from './components/TravelInfoBar';
 import MapView from './components/MapView';
 import PlaceCard from './components/PlaceCard';
@@ -26,6 +26,7 @@ function loadFromStorage<T>(key: string, defaultValue: T): T {
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabType>('map');
+  const [appMode, setAppMode] = useState<AppMode>(() => loadFromStorage('travel_mode', 'planning'));
   const [places, setPlaces] = useState<Place[]>(() => loadFromStorage('travel_places', []));
   const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>(() => loadFromStorage('travel_diary', []));
   const [travelInfo, setTravelInfo] = useState<TravelInfo>(() => loadFromStorage('travel_info', defaultTravelInfo));
@@ -48,7 +49,14 @@ export default function App() {
     localStorage.setItem('travel_info', JSON.stringify(travelInfo));
   }, [travelInfo]);
 
+  useEffect(() => {
+    localStorage.setItem('travel_mode', JSON.stringify(appMode));
+  }, [appMode]);
+
   const handleMapClick = (lat: number, lng: number) => {
+    // In modalità visita, il click sulla mappa non apre il modal
+    if (appMode === 'visit') return;
+    
     setPendingAddPlace({ lat, lng, name: '' });
     setEditingPlace(null);
     setShowPlaceModal(true);
@@ -118,6 +126,33 @@ export default function App() {
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
       <TravelInfoBar travelInfo={travelInfo} />
 
+      {/* Mode Toggle */}
+      <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-center gap-2">
+        <button
+          onClick={() => setAppMode('planning')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            appMode === 'planning'
+              ? 'bg-blue-500 text-white shadow-md'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          📋 Planning
+        </button>
+        <button
+          onClick={() => setAppMode('visit')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            appMode === 'visit'
+              ? 'bg-green-500 text-white shadow-md'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          🚶 Visita
+        </button>
+        <span className="text-xs text-slate-500 ml-2">
+          {appMode === 'planning' ? 'Organizza il viaggio' : 'Usa la mappa'}
+        </span>
+      </div>
+
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
           <div className="absolute inset-3">
@@ -128,6 +163,7 @@ export default function App() {
               onSelectPlace={setSelectedPlace}
               onAddFromSearch={handleAddFromSearch}
               apiKey={googleMapsApiKey || ''}
+              mode={appMode}
             />
           </div>
 

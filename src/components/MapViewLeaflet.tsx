@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { Place } from '../types';
+import { Place, AppMode } from '../types';
 import { useEffect, useState } from 'react';
 
 interface Props {
@@ -9,6 +9,7 @@ interface Props {
   selectedPlace: Place | null;
   onSelectPlace: (place: Place) => void;
   onAddFromSearch: (lat: number, lng: number, name: string) => void;
+  mode: AppMode;
 }
 
 interface SearchResult {
@@ -41,16 +42,18 @@ function createMarkerIcon(category: string) {
   });
 }
 
-function MapClickHandler({ onMapClick }: { onMapClick: (lat: number, lng: number) => void }) {
+function MapClickHandler({ onMapClick, mode }: { onMapClick: (lat: number, lng: number) => void; mode: AppMode }) {
   useMapEvents({
     click: (e) => {
-      onMapClick(e.latlng.lat, e.latlng.lng);
+      if (mode === 'planning') {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
     },
   });
   return null;
 }
 
-export default function MapViewLeaflet({ places, onMapClick, onSelectPlace, onAddFromSearch }: Props) {
+export default function MapViewLeaflet({ places, onMapClick, onSelectPlace, onAddFromSearch, mode }: Props) {
   const defaultCenter: [number, number] = [41.9028, 12.4964];
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -60,6 +63,14 @@ export default function MapViewLeaflet({ places, onMapClick, onSelectPlace, onAd
   useEffect(() => {
     delete (L.Icon.Default.prototype as any)._getIconUrl;
   }, []);
+
+  useEffect(() => {
+    if (mode === 'visit') {
+      setSearchQuery('');
+      setSearchResults([]);
+      setShowResults(false);
+    }
+  }, [mode]);
 
   useEffect(() => {
     if (searchQuery.length < 3) {
@@ -94,44 +105,54 @@ export default function MapViewLeaflet({ places, onMapClick, onSelectPlace, onAd
     setShowResults(false);
   };
 
+  const categoryIcons: Record<string, string> = {
+    restaurant: '🍽️',
+    attraction: '🏛️',
+    hotel: '🏨',
+    activity: '🎯',
+    other: '📍',
+  };
+
   return (
     <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-slate-200 relative">
-      {/* Search bar */}
-      <div className="absolute top-3 left-3 right-3 z-[1000]">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Cerca luoghi..."
-            className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 text-sm"
-          />
-          <div className="absolute left-3 top-1/2 -translate-y-1/2">
-            {isSearching ? (
-              <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            )}
+      {/* Search bar - solo in modalità planning */}
+      {mode === 'planning' && (
+        <div className="absolute top-3 left-3 right-3 z-[1000]">
+          <div className="relative">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cerca luoghi..."
+              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 text-sm"
+            />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2">
+              {isSearching ? (
+                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <svg className="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              )}
+            </div>
           </div>
-        </div>
 
-        {showResults && searchResults.length > 0 && (
-          <div className="mt-2 bg-white rounded-xl shadow-xl border border-slate-200 max-h-80 overflow-y-auto">
-            {searchResults.map((result) => (
-              <button
-                key={result.place_id}
-                onClick={() => handleSelectResult(result)}
-                className="w-full p-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0"
-              >
-                <p className="font-medium text-sm text-slate-900">{result.display_name.split(',')[0]}</p>
-                <p className="text-xs text-slate-500 mt-1">{result.display_name}</p>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+          {showResults && searchResults.length > 0 && (
+            <div className="mt-2 bg-white rounded-xl shadow-xl border border-slate-200 max-h-80 overflow-y-auto">
+              {searchResults.map((result) => (
+                <button
+                  key={result.place_id}
+                  onClick={() => handleSelectResult(result)}
+                  className="w-full p-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0"
+                >
+                  <p className="font-medium text-sm text-slate-900">{result.display_name.split(',')[0]}</p>
+                  <p className="text-xs text-slate-500 mt-1">{result.display_name}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <MapContainer
         center={defaultCenter}
@@ -142,7 +163,7 @@ export default function MapViewLeaflet({ places, onMapClick, onSelectPlace, onAd
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        <MapClickHandler onMapClick={onMapClick} />
+        <MapClickHandler onMapClick={onMapClick} mode={mode} />
         {places.map((place) => (
           <Marker
             key={place.id}
@@ -153,9 +174,26 @@ export default function MapViewLeaflet({ places, onMapClick, onSelectPlace, onAd
             }}
           >
             <Popup>
-              <div className="p-1">
-                <h3 className="font-bold text-sm">{place.name}</h3>
-                <p className="text-xs text-slate-500 capitalize">{place.category}</p>
+              <div className="p-2 min-w-[200px]">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-2xl">{categoryIcons[place.category]}</span>
+                  <div>
+                    <h3 className="font-bold text-sm">{place.name}</h3>
+                    <p className="text-xs text-slate-500 capitalize">{place.category}</p>
+                  </div>
+                </div>
+                {place.impressions && (
+                  <p className="text-xs text-slate-700 mb-2">{place.impressions.substring(0, 100)}...</p>
+                )}
+                {place.photos.length > 0 && (
+                  <img src={place.photos[0]} alt="" className="w-full h-24 object-cover rounded mb-2" />
+                )}
+                <button
+                  onClick={() => onSelectPlace(place)}
+                  className="w-full px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"
+                >
+                  Vedi dettagli
+                </button>
               </div>
             </Popup>
           </Marker>
