@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { GoogleMap, Marker, InfoWindow, useJsApiLoader, Autocomplete } from '@react-google-maps/api';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
 import { Place } from '../types';
 
 interface Props {
@@ -9,6 +9,13 @@ interface Props {
   onSelectPlace: (place: Place) => void;
   onSearchSelect: (lat: number, lng: number, name: string) => void;
   apiKey: string;
+}
+
+interface PredictionResult {
+  placeId: string;
+  description: string;
+  mainText: string;
+  secondaryText: string;
 }
 
 const containerStyle = {
@@ -31,22 +38,55 @@ const categoryIcons: Record<string, string> = {
 
 export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSearchSelect, apiKey }: Props) {
   const [map, setMap] = useState<google.maps.Map | null>(null);
-  const [searchResult, setSearchResult] = useState<google.maps.places.PlaceResult | null>(null);
+  const [searchResult, setSearchResult] = useState<{ lat: number; lng: number; name: string; address: string } | null>(null);
   const [selectedInfoPlace, setSelectedInfoPlace] = useState<Place | null>(null);
-  const [searchError, setSearchError] = useState<string>('');
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [predictions, setPredictions] = useState<PredictionResult[]>([]);
+  const [showPredictions, setShowPredictions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
   
-  console.log('🔑 Google Maps API Key:', apiKey ? 'Presente' : 'Mancante');
-  
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const { isLoaded, loadError } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: apiKey,
     libraries: ['places']
   });
 
-  const onLoad = useCallback((map: google.maps.Map) => {
-    console.log('✅ Google Maps caricato con successo');
-    setMap(map);
+  // Inizializza i servizi quando la mappa è pronta
+  useEffect(() => {
+    if (isLoaded && map && window.google?.maps?.places) {
+      try {
+        autocompleteService.current = new window.google.maps.places.AutocompleteService();
+        placesService.current = new window.google.maps.places.PlacesService(map);
+        setStatus('✅ Servizi Google Places inizializzati');
+        console.log('✅ AutocompleteService e PlacesService inizializzati');
+      } catch (err) {
+        console.error('❌ Errore inizializzazione servizi:', err);
+        setStatus('❌ Errore inizializzazione servizi');
+      }
+    }
+  }, [isLoaded, map]);
+
+  // Chiudi dropdown cliccando fuori
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setShowPredictions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const onLoad = useCallback((mapInstance: google.maps.Map) => {
+    console.log('✅ Google Maps caricato');
+    setMap(mapInstance);
   }, []);
 
   const onUnmount = useCallback(() => {
@@ -59,58 +99,117 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
     }
   }, [onMapClick]);
 
-  const onPlacesChanged = () => {
-    console.log('🔍 onPlacesChanged chiamato');
-    
-    if (!autocompleteRef.current) {
-      console.error('❌ autocompleteRef.current è null');
-      setSearchError('Autocomplete non inizializzato');
+  // Ricerca con debounce
+  useEffect(() => {
+    if (searchQuery.length < 2) {
+      setPredictions([]);
+      setShowPredictions(false);
       return;
     }
 
-    try {
-      const place = autocompleteRef.current.getPlace();
-      console.log('📍 Place ottenuto:', place);
-
-      if (!place.geometry) {
-        console.error('❌ Place non ha geometria:', place);
-        setSearchError('Luogo non trovato. Prova a selezionare un risultato dai suggerimenti.');
-        return;
-      }
-
-      if (!place.geometry.location) {
-        console.error('❌ Place non ha location:', place);
-        setSearchError('Coordinate non disponibili per questo luogo');
-        return;
-      }
-
-      setSearchError('');
-      setSearchResult(place);
-      
-      // Center map on selected place
-      if (map) {
-        map.panTo(place.geometry.location);
-        map.setZoom(15);
-      }
-      
-      // Call onSearchSelect with place details
-      const name = place.name || place.formatted_address || 'Luogo';
-      console.log('✅ Chiamata onSearchSelect con:', name, place.geometry.location.lat(), place.geometry.location.lng());
-      
-      onSearchSelect(
-        place.geometry.location.lat(),
-        place.geometry.location.lng(),
-        name
-      );
-    } catch (error) {
-      console.error('❌ Errore in onPlacesChanged:', error);
-      setSearchError('Errore nella ricerca. Riprova.');
+    if (searchTimeout.current) {
+      clearTimeout(searchTimeout.current);
     }
+
+    searchTimeout.current = setTimeout(() => {
+      fetchPredictions(searchQuery);
+    }, 300);
+
+    return () => {
+      if (searchTimeout.current) {
+        clearTimeout(searchTimeout.current);
+      }
+    };
+  }, [searchQuery]);
+
+  const fetchPredictions = (query: string) => {
+    if (!autocompleteService.current) {
+      console.warn('⚠️ AutocompleteService non disponibile');
+      setError('Servizio di ricerca non ancora pronto. Attendi un momento.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+
+    autocompleteService.current.getPlacePredictions(
+      { 
+        input: query,
+        types: ['establishment', 'geocode'], // Cerca sia attività che luoghi
+      },
+      (predictions, status) => {
+        setIsLoading(false);
+        
+        console.log('🔍 Predictions status:', status);
+        
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+          const results: PredictionResult[] = predictions.map(p => ({
+            placeId: p.place_id || '',
+            description: p.description || '',
+            mainText: p.structured_formatting?.main_text?.toString() || p.description?.split(',')[0] || '',
+            secondaryText: p.structured_formatting?.secondary_text?.toString() || '',
+          }));
+          setPredictions(results);
+          setShowPredictions(true);
+          console.log('✅ Predictions trovate:', results.length);
+        } else if (status === window.google.maps.places.PlacesServiceStatus.ZERO_RESULTS) {
+          setPredictions([]);
+          setShowPredictions(true);
+          console.log('⚠️ Nessun risultato');
+        } else {
+          setError(`Errore: ${status}`);
+          console.error('❌ Errore predictions:', status);
+        }
+      }
+    );
   };
 
-  const onAutocompleteLoad = (autocomplete: google.maps.places.Autocomplete) => {
-    console.log('✅ Autocomplete caricato');
-    autocompleteRef.current = autocomplete;
+  const selectPrediction = (prediction: PredictionResult) => {
+    if (!placesService.current) {
+      setError('PlacesService non disponibile');
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setShowPredictions(false);
+    setSearchQuery(prediction.description);
+
+    placesService.current.getDetails(
+      {
+        placeId: prediction.placeId,
+        fields: ['name', 'geometry', 'formatted_address', 'types', 'rating', 'user_ratings_total'],
+      },
+      (place, status) => {
+        setIsLoading(false);
+        
+        console.log('📍 Place details status:', status);
+        
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const name = place.name || prediction.mainText;
+          const address = place.formatted_address || prediction.description;
+
+          setSearchResult({ lat, lng, name, address });
+          
+          // Centra la mappa
+          if (map) {
+            map.panTo(place.geometry.location);
+            map.setZoom(15);
+          }
+
+          setStatus(`✅ "${name}" trovato!`);
+          console.log('✅ Luogo selezionato:', name, lat, lng);
+
+          // Apri il modal per aggiungere il luogo
+          onSearchSelect(lat, lng, name);
+        } else {
+          setError(`Errore nel recupero dettagli: ${status}`);
+          console.error('❌ Errore details:', status, place);
+        }
+      }
+    );
   };
 
   if (!apiKey) {
@@ -122,30 +221,19 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
           <p className="text-yellow-700 text-sm mt-2">
             Per usare Google Maps, inserisci la tua API Key nelle impostazioni
           </p>
-          <p className="text-yellow-600 text-xs mt-3">
-            Vai in ⚙️ Info → sezione 🗺️ Google Maps
-          </p>
         </div>
       </div>
     );
   }
 
   if (loadError) {
-    console.error('❌ Errore caricamento Google Maps:', loadError);
     return (
       <div className="w-full h-full flex items-center justify-center bg-red-50 rounded-xl border border-red-200">
         <div className="text-center p-6 max-w-md">
           <span className="text-5xl block mb-4">❌</span>
-          <p className="text-red-600 font-medium text-lg">Errore nel caricamento di Google Maps</p>
+          <p className="text-red-600 font-medium text-lg">Errore caricamento Google Maps</p>
           <p className="text-red-500 text-sm mt-2">
-            Verifica che la tua API Key sia valida e che le seguenti API siano abilitate:
-          </p>
-          <ul className="text-red-500 text-xs mt-2 text-left list-disc list-inside">
-            <li>Maps JavaScript API</li>
-            <li>Places API</li>
-          </ul>
-          <p className="text-red-400 text-xs mt-3">
-            Controlla anche la console del browser per maggiori dettagli
+            Verifica che Maps JavaScript API e Places API siano abilitate
           </p>
         </div>
       </div>
@@ -165,40 +253,86 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
 
   return (
     <div className="w-full h-full rounded-xl overflow-hidden shadow-lg border border-slate-200 relative">
-      {/* Search bar with Autocomplete */}
-      <div className="absolute top-3 left-3 right-3 z-10">
-        <Autocomplete
-          onLoad={onAutocompleteLoad}
-          onPlaceChanged={onPlacesChanged}
-          options={{
-            fields: ['geometry', 'name', 'formatted_address', 'place_id', 'types'],
-          }}
-        >
-          <div className="relative">
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+      {/* Search bar */}
+      <div ref={containerRef} className="absolute top-3 left-3 right-3 z-[1000]">
+        <div className="relative">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            {isLoading ? (
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            ) : (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-            </div>
-            <input
-              type="text"
-              placeholder="Cerca su Google Maps (es: ristoranti Roma)..."
-              className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-slate-400"
-            />
+            )}
           </div>
-        </Autocomplete>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => predictions.length > 0 && setShowPredictions(true)}
+            placeholder="Cerca ristoranti, hotel, luoghi..."
+            className="w-full pl-10 pr-10 py-3 bg-white border border-slate-200 rounded-xl shadow-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm placeholder-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setPredictions([]);
+                setShowPredictions(false);
+                setError('');
+              }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
 
-        {/* Error message */}
-        {searchError && (
-          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            ⚠️ {searchError}
+        {/* Predictions dropdown */}
+        {showPredictions && (
+          <div className="mt-2 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden max-h-80 overflow-y-auto">
+            {predictions.length > 0 ? (
+              predictions.map((prediction, idx) => (
+                <button
+                  key={prediction.placeId || idx}
+                  onClick={() => selectPrediction(prediction)}
+                  className="w-full p-3 hover:bg-slate-50 text-left border-b border-slate-100 last:border-b-0 transition-colors flex items-start gap-3"
+                >
+                  <span className="text-xl mt-0.5">📍</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 text-sm truncate">
+                      {prediction.mainText}
+                    </p>
+                    {prediction.secondaryText && (
+                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                        {prediction.secondaryText}
+                      </p>
+                    )}
+                  </div>
+                </button>
+              ))
+            ) : searchQuery.length >= 2 && !isLoading ? (
+              <div className="p-4 text-center text-sm text-slate-500">
+                Nessun risultato trovato
+              </div>
+            ) : null}
           </div>
         )}
 
-        {/* Success message */}
-        {searchResult && !searchError && (
-          <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-            ✅ <strong>{searchResult.name}</strong> trovato! Il modal si aprirà automaticamente.
+        {/* Error / Status messages */}
+        {error && (
+          <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            ⚠️ {error}
+          </div>
+        )}
+        {status && !error && (
+          <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg text-xs text-green-700">
+            {status}
           </div>
         )}
       </div>
@@ -218,12 +352,9 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
         }}
       >
         {/* Search result marker */}
-        {searchResult?.geometry?.location && (
+        {searchResult && (
           <Marker
-            position={{
-              lat: searchResult.geometry.location.lat(),
-              lng: searchResult.geometry.location.lng()
-            }}
+            position={{ lat: searchResult.lat, lng: searchResult.lng }}
             icon={{
               path: google.maps.SymbolPath.CIRCLE,
               scale: 12,
@@ -236,7 +367,7 @@ export default function GoogleMapView({ places, onMapClick, onSelectPlace, onSea
             <InfoWindow>
               <div className="p-1 min-w-[150px]">
                 <h3 className="font-bold text-sm">{searchResult.name}</h3>
-                <p className="text-xs text-slate-500">{searchResult.formatted_address}</p>
+                <p className="text-xs text-slate-500">{searchResult.address}</p>
               </div>
             </InfoWindow>
           </Marker>
