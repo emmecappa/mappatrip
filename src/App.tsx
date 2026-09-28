@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Place, DiaryEntry, TravelInfo, TabType } from './types';
 import TravelInfoBar from './components/TravelInfoBar';
 import MapView from './components/MapView';
-import GoogleMapView from './components/GoogleMapView';
 import PlaceCard from './components/PlaceCard';
 import PlaceModal from './components/PlaceModal';
 import PlacesList from './components/PlacesList';
@@ -33,9 +32,8 @@ export default function App() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [showPlaceModal, setShowPlaceModal] = useState(false);
   const [editingPlace, setEditingPlace] = useState<Place | null>(null);
-  const [mapClickCoords, setMapClickCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [pendingAddPlace, setPendingAddPlace] = useState<{ lat: number; lng: number; name: string } | null>(null);
 
-  // Leggi API key da variabile d'ambiente o da localStorage
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || travelInfo.googleMapsApiKey;
 
   useEffect(() => {
@@ -51,38 +49,29 @@ export default function App() {
   }, [travelInfo]);
 
   const handleMapClick = (lat: number, lng: number) => {
-    setMapClickCoords({ lat, lng });
+    setPendingAddPlace({ lat, lng, name: '' });
     setEditingPlace(null);
     setShowPlaceModal(true);
   };
 
-  const handleSearchSelect = (lat: number, lng: number, name: string) => {
-    setMapClickCoords({ lat, lng });
-    setEditingPlace({
-      id: '',
-      name,
-      lat,
-      lng,
-      impressions: '',
-      photos: [],
-      notes: '',
-      youtubeLinks: [],
-      category: 'attraction',
-      visited: false,
-    });
+  const handleAddFromSearch = (lat: number, lng: number, name: string) => {
+    setPendingAddPlace({ lat, lng, name });
+    setEditingPlace(null);
     setShowPlaceModal(true);
   };
 
   const handleSavePlace = (place: Place) => {
-    const exists = places.find(p => p.id === place.id);
-    if (exists) {
-      setPlaces(places.map(p => p.id === place.id ? place : p));
+    const existingIndex = places.findIndex(p => p.id === place.id);
+    if (existingIndex >= 0) {
+      const updated = [...places];
+      updated[existingIndex] = place;
+      setPlaces(updated);
     } else {
       setPlaces([...places, place]);
     }
     setShowPlaceModal(false);
     setEditingPlace(null);
-    setMapClickCoords(null);
+    setPendingAddPlace(null);
   };
 
   const handleDeletePlace = (id: string) => {
@@ -92,14 +81,17 @@ export default function App() {
 
   const handleEditPlace = (place: Place) => {
     setEditingPlace(place);
+    setPendingAddPlace(null);
     setShowPlaceModal(true);
     setSelectedPlace(null);
   };
 
   const handleSaveDiary = (entry: DiaryEntry) => {
-    const exists = diaryEntries.find(e => e.id === entry.id);
-    if (exists) {
-      setDiaryEntries(diaryEntries.map(e => e.id === entry.id ? entry : e));
+    const existingIndex = diaryEntries.findIndex(e => e.id === entry.id);
+    if (existingIndex >= 0) {
+      const updated = [...diaryEntries];
+      updated[existingIndex] = entry;
+      setDiaryEntries(updated);
     } else {
       setDiaryEntries([...diaryEntries, entry]);
     }
@@ -107,6 +99,12 @@ export default function App() {
 
   const handleDeleteDiary = (id: string) => {
     setDiaryEntries(diaryEntries.filter(e => e.id !== id));
+  };
+
+  const handleCloseModal = () => {
+    setShowPlaceModal(false);
+    setEditingPlace(null);
+    setPendingAddPlace(null);
   };
 
   const tabs: { id: TabType; label: string; icon: string }[] = [
@@ -118,35 +116,21 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
-      {/* Travel Info Bar */}
       <TravelInfoBar travelInfo={travelInfo} />
 
-      {/* Main content */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Map area */}
         <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
           <div className="absolute inset-3">
-            {googleMapsApiKey ? (
-              <GoogleMapView
-                places={places}
-                onMapClick={handleMapClick}
-                selectedPlace={selectedPlace}
-                onSelectPlace={setSelectedPlace}
-                onSearchSelect={handleSearchSelect}
-                apiKey={googleMapsApiKey}
-              />
-            ) : (
-              <MapView
-                places={places}
-                onMapClick={handleMapClick}
-                selectedPlace={selectedPlace}
-                onSelectPlace={setSelectedPlace}
-                onSearchSelect={handleSearchSelect}
-              />
-            )}
+            <MapView
+              places={places}
+              onMapClick={handleMapClick}
+              selectedPlace={selectedPlace}
+              onSelectPlace={setSelectedPlace}
+              onAddFromSearch={handleAddFromSearch}
+              apiKey={googleMapsApiKey || ''}
+            />
           </div>
 
-          {/* Place Card overlay */}
           {selectedPlace && (
             <div className="absolute top-4 right-4 z-50 max-h-[80vh] overflow-y-auto">
               <PlaceCard
@@ -157,22 +141,8 @@ export default function App() {
               />
             </div>
           )}
-
-          {/* FAB */}
-          <button
-            onClick={() => {
-              setEditingPlace(null);
-              setMapClickCoords(null);
-              setShowPlaceModal(true);
-            }}
-            className="absolute bottom-6 right-6 z-50 w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition-all hover:scale-110"
-            title="Aggiungi luogo"
-          >
-            +
-          </button>
         </div>
 
-        {/* Side panel */}
         <div className={`w-full lg:w-96 xl:w-[420px] bg-slate-50 border-l border-slate-200 overflow-y-auto ${activeTab === 'map' ? 'hidden lg:block' : ''}`}>
           <div className="p-4 pb-20 lg:pb-4">
             {activeTab === 'places' && (
@@ -183,8 +153,8 @@ export default function App() {
                   setActiveTab('map');
                 }}
                 onAdd={() => {
+                  setPendingAddPlace(null);
                   setEditingPlace(null);
-                  setMapClickCoords(null);
                   setShowPlaceModal(true);
                 }}
               />
@@ -206,7 +176,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Bottom nav - mobile */}
       <nav className="bg-white border-t border-slate-200 shadow-sm lg:hidden shrink-0">
         <div className="flex items-center justify-around py-2">
           {tabs.map((tab) => (
@@ -226,7 +195,6 @@ export default function App() {
         </div>
       </nav>
 
-      {/* Desktop sidebar nav */}
       <div className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-[2000] flex-col gap-1 bg-white/95 backdrop-blur-sm rounded-r-xl shadow-lg border border-slate-200 p-2">
         {tabs.map((tab) => (
           <button
@@ -245,18 +213,12 @@ export default function App() {
         ))}
       </div>
 
-      {/* Place Modal */}
       {showPlaceModal && (
         <PlaceModal
           place={editingPlace}
-          defaultLat={mapClickCoords?.lat}
-          defaultLng={mapClickCoords?.lng}
+          pendingAdd={pendingAddPlace}
           onSave={handleSavePlace}
-          onClose={() => {
-            setShowPlaceModal(false);
-            setEditingPlace(null);
-            setMapClickCoords(null);
-          }}
+          onClose={handleCloseModal}
         />
       )}
     </div>

@@ -3,16 +3,15 @@ import { useState, useEffect } from 'react';
 
 interface Props {
   place?: Place | null;
-  defaultLat?: number;
-  defaultLng?: number;
+  pendingAdd?: { lat: number; lng: number; name: string } | null;
   onSave: (place: Place) => void;
   onClose: () => void;
 }
 
-export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onClose }: Props) {
+export default function PlaceModal({ place, pendingAdd, onSave, onClose }: Props) {
   const [name, setName] = useState('');
-  const [lat, setLat] = useState(defaultLat?.toString() || '');
-  const [lng, setLng] = useState(defaultLng?.toString() || '');
+  const [lat, setLat] = useState('');
+  const [lng, setLng] = useState('');
   const [instagram, setInstagram] = useState('');
   const [impressions, setImpressions] = useState('');
   const [notes, setNotes] = useState('');
@@ -35,8 +34,12 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
       setYoutubeLinks(place.youtubeLinks);
       setCategory(place.category);
       setVisited(place.visited);
+    } else if (pendingAdd) {
+      setName(pendingAdd.name);
+      setLat(pendingAdd.lat.toString());
+      setLng(pendingAdd.lng.toString());
     }
-  }, [place]);
+  }, [place, pendingAdd]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,8 +85,8 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-thin">
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">
           <h2 className="text-lg font-bold text-gray-900">
             {place ? '✏️ Modifica Luogo' : '📍 Aggiungi Luogo'}
           </h2>
@@ -93,7 +96,6 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
             <input
@@ -106,7 +108,6 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             />
           </div>
 
-          {/* Category */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
             <div className="flex flex-wrap gap-2">
@@ -127,7 +128,6 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             </div>
           </div>
 
-          {/* Coordinates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Latitudine *</label>
@@ -153,7 +153,6 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             </div>
           </div>
 
-          {/* Instagram */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">📸 Instagram (username)</label>
             <input
@@ -165,19 +164,17 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             />
           </div>
 
-          {/* Impressions */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">💭 Impressioni</label>
             <textarea
               value={impressions}
               onChange={(e) => setImpressions(e.target.value)}
-              placeholder="Le tue prime impressioni su questo posto..."
+              placeholder="Le tue prime impressioni..."
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm resize-none"
             />
           </div>
 
-          {/* Notes */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">📝 Note personali</label>
             <textarea
@@ -189,7 +186,6 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             />
           </div>
 
-          {/* Photos */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">📷 Foto (URL)</label>
             <div className="flex gap-2">
@@ -198,7 +194,7 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
                 value={newPhotoUrl}
                 onChange={(e) => setNewPhotoUrl(e.target.value)}
                 placeholder="https://..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
               <button type="button" onClick={addPhoto} className="px-3 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600">
                 +
@@ -212,7 +208,7 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
                     <button
                       type="button"
                       onClick={() => setPhotos(photos.filter((_, i) => i !== idx))}
-                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs opacity-0 group-hover:opacity-100"
                     >
                       ×
                     </button>
@@ -222,7 +218,6 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             )}
           </div>
 
-          {/* YouTube Links */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">🎬 Link YouTube</label>
             <div className="flex gap-2">
@@ -231,7 +226,7 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
                 value={newYoutubeLink}
                 onChange={(e) => setNewYoutubeLink(e.target.value)}
                 placeholder="https://youtube.com/..."
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
               />
               <button type="button" onClick={addYoutubeLink} className="px-3 py-2 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">
                 +
@@ -256,22 +251,20 @@ export default function PlaceModal({ place, defaultLat, defaultLng, onSave, onCl
             )}
           </div>
 
-          {/* Visited */}
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
               id="visited"
               checked={visited}
               onChange={(e) => setVisited(e.target.checked)}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-4 h-4 text-blue-600 rounded"
             />
             <label htmlFor="visited" className="text-sm text-gray-700">✓ Già visitato</label>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
-            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+            className="w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium hover:from-blue-700 hover:to-indigo-700 shadow-lg"
           >
             {place ? 'Salva modifiche' : 'Aggiungi luogo'}
           </button>
