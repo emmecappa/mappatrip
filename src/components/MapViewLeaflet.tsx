@@ -1,6 +1,6 @@
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
-import { Place, AppMode } from '../types';
+import { Place, AppMode } from '../core/types';
 import { useEffect, useState } from 'react';
 
 interface Props {

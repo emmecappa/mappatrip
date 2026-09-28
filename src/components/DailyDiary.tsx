@@ -1,5 +1,6 @@
 import { DiaryEntry } from '../types';
 import { useState } from 'react';
+import { formatDateLong } from '../core/utils';
 
 interface Props {
   entries: DiaryEntry[];
@@ -80,17 +81,8 @@ export default function DailyDiary({ entries, onSave, onDelete }: Props) {
     onSave(entry);
   };
 
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('it-IT', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    });
-  };
-
   return (
     <div className="space-y-4">
-      {/* Date selector */}
       <div className="flex items-center gap-3 bg-white rounded-xl p-3 shadow-sm border border-gray-100">
         <span className="text-2xl">📅</span>
         <input
@@ -112,28 +104,21 @@ export default function DailyDiary({ entries, onSave, onDelete }: Props) {
       </div>
 
       <div className="text-center">
-        <h3 className="text-lg font-bold text-gray-900 capitalize">{formatDate(selectedDate)}</h3>
+        <h3 className="text-lg font-bold text-gray-900 capitalize">{formatDateLong(selectedDate)}</h3>
       </div>
 
-      {/* Roadmap */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Planned */}
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-blue-400"></span>
             📋 Piano della giornata
           </h4>
           <div className="diary-roadmap">
-            {(currentEntry?.planned || []).map((item, idx) => (
+            {(currentEntry?.planned || []).map((item: string, idx: number) => (
               <div key={idx} className="roadmap-item">
                 <div className="flex items-start gap-2">
                   <p className="text-sm text-gray-700 flex-1">{item}</p>
-                  <button
-                    onClick={() => removePlanned(idx)}
-                    className="text-gray-400 hover:text-red-500 text-xs"
-                  >
-                    ×
-                  </button>
+                  <button onClick={() => removePlanned(idx)} className="text-gray-400 hover:text-red-500 text-xs">×</button>
                 </div>
               </div>
             ))}
@@ -147,32 +132,21 @@ export default function DailyDiary({ entries, onSave, onDelete }: Props) {
               placeholder="Aggiungi attività..."
               className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <button
-              onClick={addPlanned}
-              className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition-colors"
-            >
-              +
-            </button>
+            <button onClick={addPlanned} className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg text-sm hover:bg-blue-200 transition-colors">+</button>
           </div>
         </div>
 
-        {/* Done */}
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-green-400"></span>
             ✅ Cosa ho fatto
           </h4>
           <div className="diary-roadmap">
-            {(currentEntry?.done || []).map((item, idx) => (
+            {(currentEntry?.done || []).map((item: string, idx: number) => (
               <div key={idx} className="roadmap-item done">
                 <div className="flex items-start gap-2">
                   <p className="text-sm text-gray-700 flex-1 line-through opacity-75">{item}</p>
-                  <button
-                    onClick={() => removeDone(idx)}
-                    className="text-gray-400 hover:text-red-500 text-xs"
-                  >
-                    ×
-                  </button>
+                  <button onClick={() => removeDone(idx)} className="text-gray-400 hover:text-red-500 text-xs">×</button>
                 </div>
               </div>
             ))}
@@ -186,37 +160,27 @@ export default function DailyDiary({ entries, onSave, onDelete }: Props) {
               placeholder="Cosa ho fatto..."
               className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-transparent"
             />
-            <button
-              onClick={addDone}
-              className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200 transition-colors"
-            >
-              +
-            </button>
+            <button onClick={addDone} className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm hover:bg-green-200 transition-colors">+</button>
           </div>
         </div>
       </div>
 
-      {/* Notes editing */}
       {isEditing && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <h4 className="font-semibold text-gray-800 mb-2">📝 Note del giorno</h4>
           <textarea
             value={diaryNotes || currentEntry?.notes || ''}
             onChange={(e) => setDiaryNotes(e.target.value)}
-            placeholder="Come è andata la giornata? Ricordi speciali..."
+            placeholder="Come è andata la giornata?"
             rows={4}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           />
-          <button
-            onClick={handleSave}
-            className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors"
-          >
+          <button onClick={handleSave} className="mt-2 px-4 py-2 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600 transition-colors">
             💾 Salva note
           </button>
         </div>
       )}
 
-      {/* Diary timeline */}
       {entries.length > 0 && (
         <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
           <h4 className="font-semibold text-gray-800 mb-3">📖 Riepilogo giorni</h4>
