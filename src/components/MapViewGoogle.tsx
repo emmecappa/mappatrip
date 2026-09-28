@@ -1,5 +1,5 @@
 import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
-import { Place, AppMode } from '../types';
+import { Place, AppMode } from '../core/types';
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 interface Props {

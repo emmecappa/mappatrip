@@ -1,118 +1,84 @@
-import { useState, useEffect } from 'react';
-import { Place, DiaryEntry, TravelInfo, TabType, AppMode } from './types';
-import TravelInfoBar from './components/TravelInfoBar';
+import { useEffect } from 'react';
+import { AppProvider, useAppContext, pluginManager } from './core';
+import TravelInfoBar from './features/travel-info/components/TravelInfoBar';
+import PlaceCard from './features/places/components/PlaceCard';
 import MapView from './components/MapView';
-import PlaceCard from './components/PlaceCard';
 import PlaceModal from './components/PlaceModal';
 import PlacesList from './components/PlacesList';
 import DailyDiary from './components/DailyDiary';
 import SettingsPanel from './components/SettingsPanel';
+import { Place, DiaryEntry, TabType } from './core/types';
 
-const defaultTravelInfo: TravelInfo = {
-  destination: '',
-  arrivalDate: new Date().toISOString().split('T')[0],
-  departureDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-  hotelName: '',
-  hotelLink: '',
-};
-
-function loadFromStorage<T>(key: string, defaultValue: T): T {
-  try {
-    const stored = localStorage.getItem(key);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return defaultValue;
-}
-
-export default function App() {
-  const [activeTab, setActiveTab] = useState<TabType>('map');
-  const [appMode, setAppMode] = useState<AppMode>(() => loadFromStorage('travel_mode', 'planning'));
-  const [places, setPlaces] = useState<Place[]>(() => loadFromStorage('travel_places', []));
-  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>(() => loadFromStorage('travel_diary', []));
-  const [travelInfo, setTravelInfo] = useState<TravelInfo>(() => loadFromStorage('travel_info', defaultTravelInfo));
-  const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
-  const [showPlaceModal, setShowPlaceModal] = useState(false);
-  const [editingPlace, setEditingPlace] = useState<Place | null>(null);
-  const [pendingAddPlace, setPendingAddPlace] = useState<{ lat: number; lng: number; name: string } | null>(null);
+function AppContent() {
+  const { state, dispatch } = useAppContext();
+  const { activeTab, appMode, places, travelInfo, selectedPlace, showPlaceModal, editingPlace, pendingAddPlace } = state;
 
   const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || travelInfo.googleMapsApiKey;
 
+  // Initialize plugins
   useEffect(() => {
-    localStorage.setItem('travel_places', JSON.stringify(places));
-  }, [places]);
-
-  useEffect(() => {
-    localStorage.setItem('travel_diary', JSON.stringify(diaryEntries));
-  }, [diaryEntries]);
-
-  useEffect(() => {
-    localStorage.setItem('travel_info', JSON.stringify(travelInfo));
-  }, [travelInfo]);
-
-  useEffect(() => {
-    localStorage.setItem('travel_mode', JSON.stringify(appMode));
-  }, [appMode]);
+    console.log('🚀 Travel Planner initialized');
+    console.log(`🔌 Plugins registrati: ${pluginManager.getAll().length}`);
+  }, []);
 
   const handleMapClick = (lat: number, lng: number) => {
-    // In modalità visita, il click sulla mappa non apre il modal
     if (appMode === 'visit') return;
-    
-    setPendingAddPlace({ lat, lng, name: '' });
-    setEditingPlace(null);
-    setShowPlaceModal(true);
+    dispatch({ type: 'SET_PENDING_ADD_PLACE', payload: { lat, lng, name: '' } });
+    dispatch({ type: 'SET_EDITING_PLACE', payload: null });
+    dispatch({ type: 'SHOW_PLACE_MODAL', payload: true });
   };
 
   const handleAddFromSearch = (lat: number, lng: number, name: string) => {
-    setPendingAddPlace({ lat, lng, name });
-    setEditingPlace(null);
-    setShowPlaceModal(true);
+    dispatch({ type: 'SET_PENDING_ADD_PLACE', payload: { lat, lng, name } });
+    dispatch({ type: 'SET_EDITING_PLACE', payload: null });
+    dispatch({ type: 'SHOW_PLACE_MODAL', payload: true });
   };
 
   const handleSavePlace = (place: Place) => {
-    const existingIndex = places.findIndex(p => p.id === place.id);
-    if (existingIndex >= 0) {
-      const updated = [...places];
-      updated[existingIndex] = place;
-      setPlaces(updated);
+    const exists = places.find(p => p.id === place.id);
+    if (exists) {
+      dispatch({ type: 'UPDATE_PLACE', payload: place });
     } else {
-      setPlaces([...places, place]);
+      dispatch({ type: 'ADD_PLACE', payload: place });
     }
-    setShowPlaceModal(false);
-    setEditingPlace(null);
-    setPendingAddPlace(null);
+    dispatch({ type: 'CLOSE_MODAL' });
   };
 
   const handleDeletePlace = (id: string) => {
-    setPlaces(places.filter(p => p.id !== id));
-    setSelectedPlace(null);
+    dispatch({ type: 'DELETE_PLACE', payload: id });
+    dispatch({ type: 'SELECT_PLACE', payload: null });
   };
 
   const handleEditPlace = (place: Place) => {
-    setEditingPlace(place);
-    setPendingAddPlace(null);
-    setShowPlaceModal(true);
-    setSelectedPlace(null);
+    dispatch({ type: 'SET_EDITING_PLACE', payload: place });
+    dispatch({ type: 'SET_PENDING_ADD_PLACE', payload: null });
+    dispatch({ type: 'SHOW_PLACE_MODAL', payload: true });
+    dispatch({ type: 'SELECT_PLACE', payload: null });
   };
 
   const handleSaveDiary = (entry: DiaryEntry) => {
-    const existingIndex = diaryEntries.findIndex(e => e.id === entry.id);
-    if (existingIndex >= 0) {
-      const updated = [...diaryEntries];
-      updated[existingIndex] = entry;
-      setDiaryEntries(updated);
+    const exists = state.diaryEntries.find(e => e.id === entry.id);
+    if (exists) {
+      dispatch({ type: 'UPDATE_DIARY_ENTRY', payload: entry });
     } else {
-      setDiaryEntries([...diaryEntries, entry]);
+      dispatch({ type: 'ADD_DIARY_ENTRY', payload: entry });
     }
   };
 
   const handleDeleteDiary = (id: string) => {
-    setDiaryEntries(diaryEntries.filter(e => e.id !== id));
+    dispatch({ type: 'DELETE_DIARY_ENTRY', payload: id });
   };
 
   const handleCloseModal = () => {
-    setShowPlaceModal(false);
-    setEditingPlace(null);
-    setPendingAddPlace(null);
+    dispatch({ type: 'CLOSE_MODAL' });
+  };
+
+  const setActiveTab = (tab: TabType) => {
+    dispatch({ type: 'SET_ACTIVE_TAB', payload: tab });
+  };
+
+  const setAppMode = (mode: 'planning' | 'visit') => {
+    dispatch({ type: 'SET_APP_MODE', payload: mode });
   };
 
   const tabs: { id: TabType; label: string; icon: string }[] = [
@@ -124,7 +90,7 @@ export default function App() {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50">
-      <TravelInfoBar travelInfo={travelInfo} />
+      <TravelInfoBar />
 
       {/* Mode Toggle */}
       <div className="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-center gap-2">
@@ -153,6 +119,11 @@ export default function App() {
         </span>
       </div>
 
+      {/* Plugin components - header */}
+      {pluginManager.getComponentsByPosition('header').map(({ name, component: Component }) => (
+        <Component key={name} />
+      ))}
+
       <div className="flex-1 flex overflow-hidden relative">
         <div className={`flex-1 relative ${activeTab !== 'map' ? 'hidden lg:block' : ''}`}>
           <div className="absolute inset-3">
@@ -160,7 +131,7 @@ export default function App() {
               places={places}
               onMapClick={handleMapClick}
               selectedPlace={selectedPlace}
-              onSelectPlace={setSelectedPlace}
+              onSelectPlace={(place) => dispatch({ type: 'SELECT_PLACE', payload: place })}
               onAddFromSearch={handleAddFromSearch}
               apiKey={googleMapsApiKey || ''}
               mode={appMode}
@@ -173,10 +144,15 @@ export default function App() {
                 place={selectedPlace}
                 onEdit={handleEditPlace}
                 onDelete={handleDeletePlace}
-                onClose={() => setSelectedPlace(null)}
+                onClose={() => dispatch({ type: 'SELECT_PLACE', payload: null })}
               />
             </div>
           )}
+
+          {/* Plugin components - map-overlay */}
+          {pluginManager.getComponentsByPosition('map-overlay').map(({ name, component: Component }) => (
+            <Component key={name} />
+          ))}
         </div>
 
         <div className={`w-full lg:w-96 xl:w-[420px] bg-slate-50 border-l border-slate-200 overflow-y-auto ${activeTab === 'map' ? 'hidden lg:block' : ''}`}>
@@ -185,19 +161,19 @@ export default function App() {
               <PlacesList
                 places={places}
                 onSelect={(place) => {
-                  setSelectedPlace(place);
+                  dispatch({ type: 'SELECT_PLACE', payload: place });
                   setActiveTab('map');
                 }}
                 onAdd={() => {
-                  setPendingAddPlace(null);
-                  setEditingPlace(null);
-                  setShowPlaceModal(true);
+                  dispatch({ type: 'SET_PENDING_ADD_PLACE', payload: null });
+                  dispatch({ type: 'SET_EDITING_PLACE', payload: null });
+                  dispatch({ type: 'SHOW_PLACE_MODAL', payload: true });
                 }}
               />
             )}
             {activeTab === 'diary' && (
               <DailyDiary
-                entries={diaryEntries}
+                entries={state.diaryEntries}
                 onSave={handleSaveDiary}
                 onDelete={handleDeleteDiary}
               />
@@ -205,13 +181,19 @@ export default function App() {
             {activeTab === 'settings' && (
               <SettingsPanel
                 travelInfo={travelInfo}
-                onSave={setTravelInfo}
+                onSave={(info) => dispatch({ type: 'SET_TRAVEL_INFO', payload: info })}
               />
             )}
+
+            {/* Plugin components - sidebar */}
+            {pluginManager.getComponentsByPosition('sidebar').map(({ name, component: Component }) => (
+              <Component key={name} />
+            ))}
           </div>
         </div>
       </div>
 
+      {/* Bottom nav - mobile */}
       <nav className="bg-white border-t border-slate-200 shadow-sm lg:hidden shrink-0">
         <div className="flex items-center justify-around py-2">
           {tabs.map((tab) => (
@@ -231,6 +213,7 @@ export default function App() {
         </div>
       </nav>
 
+      {/* Desktop sidebar nav */}
       <div className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-[2000] flex-col gap-1 bg-white/95 backdrop-blur-sm rounded-r-xl shadow-lg border border-slate-200 p-2">
         {tabs.map((tab) => (
           <button
@@ -257,6 +240,19 @@ export default function App() {
           onClose={handleCloseModal}
         />
       )}
+
+      {/* Plugin components - footer */}
+      {pluginManager.getComponentsByPosition('footer').map(({ name, component: Component }) => (
+        <Component key={name} />
+      ))}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <AppContent />
+    </AppProvider>
   );
 }

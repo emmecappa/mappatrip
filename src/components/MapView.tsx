@@ -1,4 +1,4 @@
-import { Place, AppMode } from '../types';
+import { Place, AppMode } from '../core/types';
 import MapViewLeaflet from './MapViewLeaflet';
 import MapViewGoogle from './MapViewGoogle';
 
