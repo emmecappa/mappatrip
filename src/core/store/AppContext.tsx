@@ -20,7 +20,7 @@ type Action =
   | { type: 'SELECT_PLACE'; payload: Place | null }
   | { type: 'SHOW_PLACE_MODAL'; payload: boolean }
   | { type: 'SET_EDITING_PLACE'; payload: Place | null }
-  | { type: 'SET_PENDING_ADD_PLACE'; payload: { lat: number; lng: number; name: string } | null }
+  | { type: 'SET_PENDING_ADD_PLACE'; payload: { lat: number; lng: number; name: string; googlePlaceId?: string } | null }
   | { type: 'CLOSE_MODAL' };
 
 /**

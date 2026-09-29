@@ -28,8 +28,8 @@ function AppContent() {
     dispatch({ type: 'SHOW_PLACE_MODAL', payload: true });
   };
 
-  const handleAddFromSearch = (lat: number, lng: number, name: string) => {
-    dispatch({ type: 'SET_PENDING_ADD_PLACE', payload: { lat, lng, name } });
+  const handleAddFromSearch = (lat: number, lng: number, name: string, placeId?: string) => {
+    dispatch({ type: 'SET_PENDING_ADD_PLACE', payload: { lat, lng, name, googlePlaceId: placeId } });
     dispatch({ type: 'SET_EDITING_PLACE', payload: null });
     dispatch({ type: 'SHOW_PLACE_MODAL', payload: true });
   };
