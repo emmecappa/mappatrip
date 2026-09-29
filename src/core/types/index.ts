@@ -11,6 +11,7 @@ export interface Place {
   youtubeLinks: string[];
   category: PlaceCategory;
   visited: boolean;
+  googlePlaceId?: string; // ID nativo Google Maps
   createdAt?: string;
   updatedAt?: string;
 }

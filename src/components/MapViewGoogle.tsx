@@ -1,13 +1,14 @@
 import { GoogleMap, Marker, InfoWindow, useJsApiLoader } from '@react-google-maps/api';
 import { Place, AppMode } from '../core/types';
 import { useState, useRef, useCallback, useEffect } from 'react';
+import PlaceDetailsGoogle from './PlaceDetailsGoogle';
 
 interface Props {
   places: Place[];
   onMapClick: (lat: number, lng: number) => void;
   selectedPlace: Place | null;
   onSelectPlace: (place: Place) => void;
-  onAddFromSearch: (lat: number, lng: number, name: string) => void;
+  onAddFromSearch: (lat: number, lng: number, name: string, placeId?: string) => void;
   apiKey: string;
   mode: AppMode;
 }
@@ -146,7 +147,7 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
     placesService.current.getDetails(
       {
         placeId: prediction.place_id,
-        fields: ['name', 'geometry', 'formatted_address']
+        fields: ['name', 'geometry', 'formatted_address', 'place_id']
       },
       (place, status) => {
         setIsLoading(false);
@@ -155,13 +156,14 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
           const lat = place.geometry.location.lat();
           const lng = place.geometry.location.lng();
           const name = place.name || prediction.structured_formatting?.main_text || 'Luogo';
+          const placeId = place.place_id || prediction.place_id;
 
           if (map) {
             map.panTo(place.geometry.location);
             map.setZoom(15);
           }
 
-          onAddFromSearch(lat, lng, name);
+          onAddFromSearch(lat, lng, name, placeId);
           setSearchQuery('');
           setPredictions([]);
         }
@@ -267,47 +269,54 @@ export default function MapViewGoogle({ places, onMapClick, onSelectPlace, onAdd
           <InfoWindow
             position={{ lat: selectedInfoPlace.lat, lng: selectedInfoPlace.lng }}
             onCloseClick={() => setSelectedInfoPlace(null)}
+            options={{ maxWidth: 350 }}
           >
-            <div className="p-2 min-w-[220px]">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">{categoryIcons[selectedInfoPlace.category]}</span>
-                <div>
-                  <h3 className="font-bold text-sm">{selectedInfoPlace.name}</h3>
-                  <p className="text-xs text-slate-500 capitalize">{selectedInfoPlace.category}</p>
+            <div className="min-w-[280px]">
+              {selectedInfoPlace.googlePlaceId ? (
+                <PlaceDetailsGoogle place={selectedInfoPlace} apiKey={apiKey} />
+              ) : (
+                <div className="p-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-2xl">{categoryIcons[selectedInfoPlace.category]}</span>
+                    <div>
+                      <h3 className="font-bold text-sm">{selectedInfoPlace.name}</h3>
+                      <p className="text-xs text-slate-500 capitalize">{selectedInfoPlace.category}</p>
+                    </div>
+                  </div>
+                  {selectedInfoPlace.photos && selectedInfoPlace.photos.length > 0 && (
+                    <img 
+                      src={selectedInfoPlace.photos[0]} 
+                      alt={selectedInfoPlace.name}
+                      className="w-full h-28 object-cover rounded mb-2"
+                    />
+                  )}
+                  {selectedInfoPlace.impressions && (
+                    <p className="text-xs text-slate-700 mb-2">{selectedInfoPlace.impressions.substring(0, 120)}...</p>
+                  )}
+                  {selectedInfoPlace.notes && (
+                    <p className="text-xs text-slate-600 mb-2 italic">📝 {selectedInfoPlace.notes.substring(0, 100)}...</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        onSelectPlace(selectedInfoPlace);
+                        setSelectedInfoPlace(null);
+                      }}
+                      className="flex-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"
+                    >
+                      Dettagli
+                    </button>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${selectedInfoPlace.lat},${selectedInfoPlace.lng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200"
+                    >
+                      🗺️
+                    </a>
+                  </div>
                 </div>
-              </div>
-              {selectedInfoPlace.photos && selectedInfoPlace.photos.length > 0 && (
-                <img 
-                  src={selectedInfoPlace.photos[0]} 
-                  alt={selectedInfoPlace.name}
-                  className="w-full h-28 object-cover rounded mb-2"
-                />
               )}
-              {selectedInfoPlace.impressions && (
-                <p className="text-xs text-slate-700 mb-2">{selectedInfoPlace.impressions.substring(0, 120)}...</p>
-              )}
-              {selectedInfoPlace.notes && (
-                <p className="text-xs text-slate-600 mb-2 italic">📝 {selectedInfoPlace.notes.substring(0, 100)}...</p>
-              )}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    onSelectPlace(selectedInfoPlace);
-                    setSelectedInfoPlace(null);
-                  }}
-                  className="flex-1 px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium hover:bg-blue-600"
-                >
-                  Dettagli
-                </button>
-                <a
-                  href={`https://www.google.com/maps/search/?api=1&query=${selectedInfoPlace.lat},${selectedInfoPlace.lng}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-200"
-                >
-                  🗺️
-                </a>
-              </div>
             </div>
           </InfoWindow>
         )}

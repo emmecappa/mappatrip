@@ -7,7 +7,7 @@ interface Props {
   onMapClick: (lat: number, lng: number) => void;
   selectedPlace: Place | null;
   onSelectPlace: (place: Place) => void;
-  onAddFromSearch: (lat: number, lng: number, name: string) => void;
+  onAddFromSearch: (lat: number, lng: number, name: string, placeId?: string) => void;
   apiKey: string;
   mode: AppMode;
 }

@@ -55,7 +55,7 @@ export interface AppState {
   selectedPlace: Place | null;
   showPlaceModal: boolean;
   editingPlace: Place | null;
-  pendingAddPlace: { lat: number; lng: number; name: string } | null;
+  pendingAddPlace: { lat: number; lng: number; name: string; googlePlaceId?: string } | null;
 }
 
 /**

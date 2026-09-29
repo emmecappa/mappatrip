@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 
 interface Props {
   place?: Place | null;
-  pendingAdd?: { lat: number; lng: number; name: string } | null;
+  pendingAdd?: { lat: number; lng: number; name: string; googlePlaceId?: string } | null;
   onSave: (place: Place) => void;
   onClose: () => void;
 }
@@ -21,6 +21,7 @@ export default function PlaceModal({ place, pendingAdd, onSave, onClose }: Props
   const [visited, setVisited] = useState(false);
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [newYoutubeLink, setNewYoutubeLink] = useState('');
+  const [googlePlaceId, setGooglePlaceId] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (place) {
@@ -34,10 +35,12 @@ export default function PlaceModal({ place, pendingAdd, onSave, onClose }: Props
       setYoutubeLinks(place.youtubeLinks);
       setCategory(place.category);
       setVisited(place.visited);
+      setGooglePlaceId(place.googlePlaceId);
     } else if (pendingAdd) {
       setName(pendingAdd.name);
       setLat(pendingAdd.lat.toString());
       setLng(pendingAdd.lng.toString());
+      setGooglePlaceId(pendingAdd.googlePlaceId);
     }
   }, [place, pendingAdd]);
 
@@ -57,6 +60,7 @@ export default function PlaceModal({ place, pendingAdd, onSave, onClose }: Props
       youtubeLinks,
       category,
       visited,
+      googlePlaceId,
     };
     onSave(newPlace);
   };
