@@ -1,16 +1,19 @@
 import { useState } from 'react';
 import { Place } from '../../../core/types';
 import { CATEGORY_ICONS, CATEGORY_LABELS, getGoogleMapsUrl, getInstagramUrl } from '../../../core/utils';
+import PlaceDetailsGoogle from '../../../components/PlaceDetailsGoogle';
 
 interface Props {
   place: Place;
   onEdit: (place: Place) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  apiKey?: string;
 }
 
-export default function PlaceCard({ place, onEdit, onDelete, onClose }: Props) {
+export default function PlaceCard({ place, onEdit, onDelete, onClose, apiKey }: Props) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showGoogleDetails, setShowGoogleDetails] = useState(!!place.googlePlaceId);
 
   const categoryColors: Record<string, string> = {
     restaurant: 'bg-red-100 text-red-800',
@@ -26,7 +29,7 @@ export default function PlaceCard({ place, onEdit, onDelete, onClose }: Props) {
       <div className="relative p-5 bg-gradient-to-br from-blue-50 to-indigo-50">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white text-gray-600 hover:text-gray-900 transition-colors"
+          className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white text-gray-600 hover:text-gray-900 transition-colors z-10"
         >
           ✕
         </button>
@@ -46,8 +49,39 @@ export default function PlaceCard({ place, onEdit, onDelete, onClose }: Props) {
         )}
       </div>
 
+      {/* Toggle Google/Personal Info */}
+      {place.googlePlaceId && apiKey && (
+        <div className="flex border-b border-gray-200">
+          <button
+            onClick={() => setShowGoogleDetails(true)}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              showGoogleDetails
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            🌐 Google Maps
+          </button>
+          <button
+            onClick={() => setShowGoogleDetails(false)}
+            className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
+              !showGoogleDetails
+                ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            📝 Le mie note
+          </button>
+        </div>
+      )}
+
       {/* Content */}
-      <div className="p-5 space-y-4 max-h-96 overflow-y-auto">
+      <div className="p-5 space-y-4 max-h-[500px] overflow-y-auto">
+        {/* Google Maps Details */}
+        {showGoogleDetails && place.googlePlaceId && apiKey ? (
+          <PlaceDetailsGoogle place={place} apiKey={apiKey} />
+        ) : (
+          <>
         {/* Instagram */}
         {place.instagram && (
           <div className="flex items-center gap-2 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg">
@@ -121,6 +155,8 @@ export default function PlaceCard({ place, onEdit, onDelete, onClose }: Props) {
         <div className="text-xs text-gray-400">
           📍 {place.lat.toFixed(4)}, {place.lng.toFixed(4)}
         </div>
+          </>
+        )}
       </div>
 
       {/* Actions */}

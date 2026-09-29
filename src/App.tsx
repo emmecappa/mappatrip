@@ -145,6 +145,7 @@ function AppContent() {
                 onEdit={handleEditPlace}
                 onDelete={handleDeletePlace}
                 onClose={() => dispatch({ type: 'SELECT_PLACE', payload: null })}
+                apiKey={googleMapsApiKey}
               />
             </div>
           )}
